@@ -36,15 +36,11 @@ class MrpWorkorder(models.Model):
 
                 new_mo.action_confirm()
 
-                # Bitmiş iş emirlerini kapat ve miktarlarını sıfırla
                 for new_workorder, original_workorder in zip(new_mo.workorder_ids.sorted('id'), production.workorder_ids.sorted('id')):
-                    if original_workorder.state == 'done':
+                    if original_workorder.qty_produced >= original_workorder.qty_production:
                         new_workorder.qty_production = 0
                         new_workorder.qty_produced = 0
                         new_workorder.write({'state': 'done'})
-                    elif original_workorder.qty_produced > 0:
-                        remaining_in_workorder = original_workorder.qty_production - original_workorder.qty_produced
-                        new_workorder.qty_production = remaining_in_workorder
 
                 _logger.warning(f"🆕 Yeni Üretim Emri: {new_mo.name} — Miktar: {remaining_qty}")
                 _logger.warning(f"🛠 Yeni üretim emrindeki iş emirleri ayarlandı: {new_mo.workorder_ids.mapped('name')}")
