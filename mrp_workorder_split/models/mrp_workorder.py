@@ -9,7 +9,6 @@ class MrpWorkorder(models.Model):
     def record_production(self, *args, **kwargs):
         _logger.warning(f"✅ [MODÜL] record_production override edildi — {self.name}")
 
-        # Standart işlemi çalıştır
         res = super().record_production(*args, **kwargs)
 
         for workorder in self:
@@ -21,22 +20,11 @@ class MrpWorkorder(models.Model):
 
             workorders = production.workorder_ids.sorted('id')
             if workorder != workorders[0] and workorder != workorders[-1] and 0 < produced_qty < expected_qty:
-                _logger.warning("🔁 Parçalı üretim tespit edildi. Üretim emri bölünüyor...")
+                _logger.warning("🔁 Parçalı üretim tespit edildi. Odoo'nun backorder mekanizması tetikleniyor...")
 
-                remaining_qty = expected_qty - produced_qty
-                new_mo = self.env['mrp.production'].create({
-                    'product_id': production.product_id.id,
-                    'bom_id': production.bom_id.id,
-                    'product_qty': remaining_qty,
-                    'origin': f"{production.name} - Kalan",
-                    'company_id': production.company_id.id,
-                    'location_src_id': production.location_src_id.id,
-                    'location_dest_id': production.location_dest_id.id,
-                })
+                # Odoo'nun backorder mekanizmasını çağır
+                production._split_production(produced_qty)
 
-                new_mo.action_confirm()
-
-                _logger.warning(f"🆕 Yeni Üretim Emri: {new_mo.name} — Miktar: {remaining_qty}")
-                _logger.warning(f"🛠 Yeni üretim emrinde iş emirleri: {new_mo.workorder_ids.mapped('name')}")
+                _logger.warning(f"🆕 Backorder üretim emri oluşturuldu. Ana üretim emri: {production.name}")
 
         return res
