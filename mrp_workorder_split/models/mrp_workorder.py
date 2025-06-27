@@ -15,7 +15,7 @@ class MrpWorkorder(models.Model):
             return super().record_production()
 
         produced = self.qty_produced
-        planned = self.qty_production  # üretilecek toplam miktar (iş emri özelinde)
+        planned = self.qty_production
 
         _logger.warning(f"📊 Üretilen: {produced}, Planlanan: {planned}, İş Emri: {self.name}")
 
@@ -26,13 +26,15 @@ class MrpWorkorder(models.Model):
 
             remaining_qty = planned - produced
 
+            # 👇 Mevcut iş emirlerinin eşleşmesini engellemek için iş emirlerini temizliyoruz
             new_mo = production.copy({
                 'product_qty': remaining_qty,
                 'origin': f"{production.name} - Kalan",
-                'workorder_ids': False,
+                'workorder_ids': [(5, 0, 0)],  # ← tüm iş emirlerini temizle
                 'state': 'confirmed',
             })
 
+            # Standart süreçleri yeniden çalıştır
             new_mo.action_confirm()
             new_mo.action_assign()
             new_mo._generate_workorders()
