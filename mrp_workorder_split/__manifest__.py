@@ -1,6 +1,6 @@
 {
     "name": "MRP Workorder Split",
-    "version": "16.0.1.0.2",  # ⬅️ Versiyon bilgisi
+    "version": "16.0.1.0.2",
     "summary": "Allows partial workorder completion and auto-creates new workorders for remaining quantity.",
     "description": """
         This module enables partial processing of MRP Work Orders.
