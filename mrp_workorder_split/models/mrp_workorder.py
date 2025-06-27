@@ -18,14 +18,11 @@ class MrpWorkorder(models.Model):
             if produced_qty < planned_qty:
                 remaining_qty = planned_qty - produced_qty
 
-                _logger.warning(f"➕ Yeni iş emri oluşturuluyor — {workorder.name} | Kalan: {remaining_qty}")
+                _logger.warning(f"🔁 Kalan üretim için yeni iş emri hazırlanıyor — Kalan: {remaining_qty}")
 
-                self.env['mrp.workorder'].create({
-                    'production_id': workorder.production_id.id,
-                    'operation_id': workorder.operation_id.id,
-                    'workcenter_id': workorder.workcenter_id.id,
-                    'qty_produced': 0,
-                    'state': 'ready',  # işleme hazır hale getirebilirsin
-                })
+                # Yeni iş emri için yeni workorder kaydı yaratmak için production_id'den routing işlenmesini tekrar çağıracağız
+                workorder.production_id._generate_workorders()
+
+                _logger.warning(f"✅ Yeni iş emirleri oluşturuldu. Üretim emri: {workorder.production_id.name}")
 
         return res
