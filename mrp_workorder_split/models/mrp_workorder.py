@@ -1,40 +1,30 @@
-from odoo import models
-import logging
+def record_production(self):
+    self.ensure_one()
+    workorder = self
+    production = workorder.production_id
 
-_logger = logging.getLogger(__name__)
+    # loglama
+    _logger.warning("✅ [MODÜL] record_production override edildi!")
+    _logger.warning("📊 [MODÜL] Üretilen Toplam: %s, Planlanan: %s, İş Emri: %s",
+                    workorder.qty_produced, production.product_qty, workorder.name)
 
-class MrpWorkorder(models.Model):
-    _inherit = 'mrp.workorder'
+    result = super().record_production()
 
-    def record_production(self):
-        _logger.warning("✅ [MODÜL] record_production override edildi!")
-        res = super().record_production()
+    if workorder.qty_produced < production.product_qty:
+        remaining_qty = production.product_qty - workorder.qty_produced
+        _logger.warning("🛠️ [MODÜL] Üretim tamamlanmadı. Yeni üretim emri oluşturuluyor. Kalan: %s", remaining_qty)
 
-        for workorder in self:
-            produced = workorder.qty_produced
-            expected = workorder.qty_production  # bu zaten float
+        new_mo = self.env['mrp.production'].create({
+            'product_id': production.product_id.id,
+            'product_qty': remaining_qty,
+            'product_uom_id': production.product_uom_id.id,
+            'bom_id': production.bom_id.id,
+            'origin': f"{production.name} - Split",
+            'company_id': production.company_id.id,
+            'routing_id': production.bom_id.routing_id.id if production.bom_id.routing_id else None,
+        })
+        new_mo._onchange_move_raw()
+        new_mo._create_workorder_routing()
+        _logger.warning("✅ [MODÜL] Yeni Üretim Emri oluşturuldu: %s", new_mo.name)
 
-            _logger.warning(f"📊 [MODÜL] {workorder.name} — Üretilen: {produced}, Planlanan: {expected}")
-
-            if 0 < produced < expected:
-                remaining_qty = expected - produced
-                production = workorder.production_id
-
-                _logger.warning(f"⏸ [MODÜL] Parçalı üretim tespit edildi. Yeni üretim emri açılıyor. Kalan: {remaining_qty}")
-
-                new_mo = self.env['mrp.production'].create({
-                    'product_id': production.product_id.id,
-                    'product_qty': remaining_qty,
-                    'product_uom_id': production.product_uom_id.id,
-                    'bom_id': production.bom_id.id,
-                    'origin': f"{production.name} - Split",
-                    'company_id': production.company_id.id,
-                    'routing_id': production.routing_id.id if production.routing_id else None,
-                })
-
-                # ❗ Bu satır değişti:
-                new_mo._create_workorder_lines()
-
-                _logger.warning(f"✅ [MODÜL] Yeni üretim emri oluşturuldu: {new_mo.name} ({remaining_qty})")
-
-        return res
+    return
