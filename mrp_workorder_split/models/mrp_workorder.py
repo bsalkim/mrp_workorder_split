@@ -7,20 +7,22 @@ class MrpWorkorder(models.Model):
     _inherit = 'mrp.workorder'
 
     def record_production(self):
+        _logger.warning("✅ [MODÜL] record_production override edildi!")
         res = super().record_production()
 
         for workorder in self:
             production = workorder.production_id
             planned_qty = production.product_qty
-
-            # Toplam üretilen miktarı hesapla
             total_produced = sum(production.workorder_ids.mapped('qty_produced'))
 
-            if total_produced < planned_qty:
-                _logger.warning(f"⏸ Parçalı üretim tespit edildi: {total_produced}/{planned_qty}")
+            _logger.warning(f"📊 [MODÜL] Üretilen Toplam: {total_produced}, Planlanan: {planned_qty}, İş Emri: {workorder.name}")
 
-                # Üretim emrinin yeni kopyasını oluştur
+            if total_produced < planned_qty:
                 remaining_qty = planned_qty - total_produced
+
+                _logger.warning(f"⏸ [MODÜL] Parçalı üretim tespit edildi — kalan {remaining_qty} adet")
+
+                # Aynı ürün için yeni üretim emri oluştur
                 new_mo = self.env['mrp.production'].create({
                     'product_id': production.product_id.id,
                     'product_qty': remaining_qty,
@@ -30,9 +32,7 @@ class MrpWorkorder(models.Model):
                     'company_id': production.company_id.id,
                 })
 
-                # Yeni üretim emri için iş emirleri oluştur
                 new_mo._generate_workorders()
-
-                _logger.warning(f"✅ Yeni üretim emri oluşturuldu: {new_mo.name} ({remaining_qty} adet)")
+                _logger.warning(f"✅ [MODÜL] Yeni üretim emri oluşturuldu: {new_mo.name} ({remaining_qty} adet)")
 
         return res
