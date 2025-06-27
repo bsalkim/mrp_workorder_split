@@ -12,7 +12,7 @@ class MrpWorkorder(models.Model):
 
         for workorder in self:
             produced = workorder.qty_produced
-            expected = workorder.qty_production  # düzeltildi ✅
+            expected = workorder.qty_production  # bu zaten float
 
             _logger.warning(f"📊 [MODÜL] {workorder.name} — Üretilen: {produced}, Planlanan: {expected}")
 
@@ -29,9 +29,12 @@ class MrpWorkorder(models.Model):
                     'bom_id': production.bom_id.id,
                     'origin': f"{production.name} - Split",
                     'company_id': production.company_id.id,
+                    'routing_id': production.routing_id.id if production.routing_id else None,
                 })
 
-                new_mo._generate_workorders()
+                # ❗ Bu satır değişti:
+                new_mo._create_workorder_lines()
+
                 _logger.warning(f"✅ [MODÜL] Yeni üretim emri oluşturuldu: {new_mo.name} ({remaining_qty})")
 
         return res
