@@ -20,11 +20,24 @@ class MrpWorkorder(models.Model):
 
             workorders = production.workorder_ids.sorted('id')
             if workorder != workorders[0] and workorder != workorders[-1] and 0 < produced_qty < expected_qty:
-                _logger.warning("🔁 Parçalı üretim tespit edildi. Odoo'nun backorder mekanizması tetikleniyor...")
+                _logger.warning("🔁 Parçalı üretim tespit edildi. Üretim emri draft'a çekilip bölünecek...")
 
-                # Odoo'nun backorder mekanizmasını çağır
-                production._split_production(produced_qty)
+                # İş emirlerini iptal et
+                production.workorder_ids.button_cancel()
 
-                _logger.warning(f"🆕 Backorder üretim emri oluşturuldu. Ana üretim emri: {production.name}")
+                # Üretim emrini draft'a çek
+                production.write({'state': 'draft'})
+
+                # Split işlemini tetikle
+                split_wizard = self.env['mrp.production.split'].create({
+                    'production_id': production.id,
+                    'split_qty': produced_qty,
+                })
+                split_wizard.do_split()
+
+                _logger.warning("✅ Split işlemi tamamlandı, üretim emri tekrar başlatılıyor...")
+
+                # Üretim emrini tekrar onayla
+                production.action_confirm()
 
         return res
