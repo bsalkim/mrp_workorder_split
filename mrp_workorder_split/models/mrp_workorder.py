@@ -1,4 +1,4 @@
-from odoo import models, api
+from odoo import models
 import logging
 
 _logger = logging.getLogger(__name__)
@@ -8,7 +8,6 @@ class MrpWorkorder(models.Model):
 
     def record_production(self):
         _logger.warning(f"✅ record_production override çalıştı — {self.name}")
-
         res = super().record_production()
 
         for workorder in self:
@@ -18,11 +17,19 @@ class MrpWorkorder(models.Model):
             if produced_qty < planned_qty:
                 remaining_qty = planned_qty - produced_qty
 
-                _logger.warning(f"🔁 Kalan üretim için yeni iş emri hazırlanıyor — Kalan: {remaining_qty}")
+                _logger.warning(f"➕ Yeni iş emri oluşturuluyor — Kalan miktar: {remaining_qty}")
 
-                # Yeni iş emri için yeni workorder kaydı yaratmak için production_id'den routing işlenmesini tekrar çağıracağız
-                workorder.production_id._generate_workorders()
+                new_workorder = self.env['mrp.workorder'].create({
+                    'production_id': workorder.production_id.id,
+                    'operation_id': workorder.operation_id.id,
+                    'workcenter_id': workorder.workcenter_id.id,
+                    'qty_produced': 0,
+                    'state': 'ready',
+                    'name': f"{workorder.name}-KALAN",
+                    'duration_expected': workorder.duration_expected,
+                    'product_id': workorder.product_id.id,
+                })
 
-                _logger.warning(f"✅ Yeni iş emirleri oluşturuldu. Üretim emri: {workorder.production_id.name}")
+                _logger.warning(f"✅ Yeni iş emri oluşturuldu: {new_workorder.name}")
 
         return res
