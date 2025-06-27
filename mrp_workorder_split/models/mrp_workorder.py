@@ -6,22 +6,26 @@ _logger = logging.getLogger(__name__)
 class MrpWorkorder(models.Model):
     _inherit = 'mrp.workorder'
 
-    def button_finish(self):
-        _logger.warning("🧪 MODÜL TEST — button_finish() çalıştı")
-        return super().button_finish()
+    def record_production(self):
+        _logger.warning(f"✅ [MODÜL AKTİF] record_production() çağrıldı — İş Emri: {self.name} — Üretilen: {self.qty_produced} / Planlanan: {self.qty_to_produce}")
 
-    def action_done(self):
-        _logger.warning("🧪 MODÜL TEST — action_done() çalıştı")
-        return super().action_done()
+        res = super().record_production()
 
-    def action_finish(self):
-        _logger.warning("🧪 MODÜL TEST — action_finish() çalıştı")
-        return super().action_finish()
+        for workorder in self:
+            produced_qty = workorder.qty_produced
+            planned_qty = workorder.qty_to_produce
 
-    def action_end(self):
-        _logger.warning("🧪 MODÜL TEST — action_end() çalıştı")
-        return super().action_end()
+            # Eğer eksik üretim varsa yeni iş emri oluştur
+            if produced_qty < planned_qty:
+                remaining_qty = planned_qty - produced_qty
+                _logger.warning(f"➕ Yeni iş emri oluşturuluyor — Kalan: {remaining_qty}")
 
-    def mark_done(self):
-        _logger.warning("🧪 MODÜL TEST — mark_done() çalıştı")
-        return super().mark_done()
+                self.env['mrp.workorder'].create({
+                    'production_id': workorder.production_id.id,
+                    'operation_id': workorder.operation_id.id,
+                    'workcenter_id': workorder.workcenter_id.id,
+                    'qty_to_produce': remaining_qty,
+                    'qty_produced': 0,
+                })
+
+        return res
