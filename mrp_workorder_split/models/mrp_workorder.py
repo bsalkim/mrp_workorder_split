@@ -1,4 +1,5 @@
-from odoo import models, api
+from odoo import models, api, _
+from odoo.exceptions import UserError
 import logging
 
 _logger = logging.getLogger(__name__)
@@ -7,6 +8,8 @@ class MrpWorkorder(models.Model):
     _inherit = 'mrp.workorder'
 
     def record_production(self):
+        raise UserError(_("TEST: Bu mesajı görüyorsan modül override ediyor ✅"))
+
         _logger.warning(f"✅ [MODÜL AKTİF] record_production() çağrıldı — İş Emri: {self.name} — Üretilen: {self.qty_produced} / Planlanan: {self.qty_to_produce}")
 
         res = super().record_production()
@@ -15,7 +18,6 @@ class MrpWorkorder(models.Model):
             produced_qty = workorder.qty_produced
             planned_qty = workorder.qty_to_produce
 
-            # Eğer eksik üretim varsa yeni iş emri oluştur
             if produced_qty < planned_qty:
                 remaining_qty = planned_qty - produced_qty
                 _logger.warning(f"➕ Yeni iş emri oluşturuluyor — Kalan: {remaining_qty}")
