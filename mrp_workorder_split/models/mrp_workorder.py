@@ -12,7 +12,7 @@ class MrpWorkorder(models.Model):
 
         for workorder in self:
             produced = workorder.qty_produced
-            expected = workorder.qty_production.product_qty  # ← düzeltildi
+            expected = workorder.qty_production  # düzeltildi ✅
 
             _logger.warning(f"📊 [MODÜL] {workorder.name} — Üretilen: {produced}, Planlanan: {expected}")
 
