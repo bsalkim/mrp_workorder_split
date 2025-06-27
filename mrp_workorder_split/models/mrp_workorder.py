@@ -9,7 +9,7 @@ class MrpWorkorder(models.Model):
     def record_production(self, *args, **kwargs):
         _logger.warning(f"✅ [MODÜL] record_production override edildi — {self.name}")
 
-        # Önce Odoo'nun standart sürecini çalıştır
+        # Standart işlemi çalıştır
         res = super().record_production(*args, **kwargs)
 
         for workorder in self:
@@ -19,7 +19,6 @@ class MrpWorkorder(models.Model):
 
             _logger.warning(f"📊 Üretilen: {produced_qty}, Planlanan: {expected_qty}, İş Emri: {workorder.name}")
 
-            # Sadece parçalı üretim ve ilk/son iş emri değilse böl
             workorders = production.workorder_ids.sorted('id')
             if workorder != workorders[0] and workorder != workorders[-1] and 0 < produced_qty < expected_qty:
                 _logger.warning("🔁 Parçalı üretim tespit edildi. Üretim emri bölünüyor...")
@@ -36,7 +35,6 @@ class MrpWorkorder(models.Model):
                 })
 
                 new_mo.action_confirm()
-                new_mo._generate_workorders()
 
                 _logger.warning(f"🆕 Yeni Üretim Emri: {new_mo.name} — Miktar: {remaining_qty}")
                 _logger.warning(f"🛠 Yeni üretim emrinde iş emirleri: {new_mo.workorder_ids.mapped('name')}")
