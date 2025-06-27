@@ -11,31 +11,33 @@ class MrpWorkorder(models.Model):
         _logger.warning(f"✅ [MODÜL] record_production override edildi — {self.name}")
 
         production = self.production_id
-        produced = self.qty_producing
-        expected = production.product_qty
-        _logger.warning(f"📊 Üretilen: {produced}, Planlanan: {expected}, İş Emri: {self.name}")
+        if not production:
+            return super().record_production()
 
-        # Standart üretim işlemini yap
-        result = super().record_production()
+        produced = self.qty_produced
+        planned = self.qty_production  # üretilecek toplam miktar (iş emri özelinde)
 
-        # Parçalı üretim kontrolü (sadece son iş emri değilse ve eksik üretildiyse)
-        if produced < expected and not self == production.workorder_ids[-1]:
-            _logger.warning("🔁 Parçalı üretim tespit edildi. MO bölme işlemi başlatılıyor.")
+        _logger.warning(f"📊 Üretilen: {produced}, Planlanan: {planned}, İş Emri: {self.name}")
 
-            # Üretim emrini kopyalıyoruz
-            defaults = {
-                'product_qty': expected - produced,
-                'origin': production.name,
-            }
-            _logger.warning(f"📎 Üretim Emri Kopyalanıyor... {production.name}")
-            new_mo = production.copy(default=defaults)
+        res = super().record_production()
 
-            _logger.warning(f"✅ Yeni Üretim Emri: {new_mo.name} | Miktar: {new_mo.product_qty}")
+        if produced < planned:
+            _logger.warning("🔁 Parçalı üretim tespit edildi. Üretim emri bölünüyor...")
 
-            # Yeni üretim emrini aktive et
+            remaining_qty = planned - produced
+
+            new_mo = production.copy({
+                'product_qty': remaining_qty,
+                'origin': f"{production.name} - Kalan",
+                'workorder_ids': False,
+                'state': 'confirmed',
+            })
+
             new_mo.action_confirm()
             new_mo.action_assign()
-            new_mo._create_workorder_lines()
+            new_mo._generate_workorders()
+
+            _logger.warning(f"🆕 Yeni Üretim Emri: {new_mo.name} — Miktar: {remaining_qty}")
             _logger.warning(f"🛠 Yeni üretim emrinde iş emirleri oluşturuldu: {new_mo.workorder_ids.mapped('name')}")
 
-        return result
+        return res
