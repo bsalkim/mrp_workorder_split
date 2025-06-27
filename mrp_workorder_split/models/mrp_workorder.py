@@ -1,4 +1,4 @@
-from odoo import models
+from odoo import models, api
 import logging
 
 _logger = logging.getLogger(__name__)
@@ -7,29 +7,32 @@ class MrpWorkorder(models.Model):
     _inherit = 'mrp.workorder'
 
     def record_production(self):
-        _logger.warning(f"✅ record_production override çalıştı — {self.name}")
         res = super().record_production()
 
         for workorder in self:
-            produced_qty = workorder.qty_produced
-            planned_qty = workorder.production_id.product_qty
+            production = workorder.production_id
+            planned_qty = production.product_qty
 
-            if produced_qty < planned_qty:
-                remaining_qty = planned_qty - produced_qty
+            # Toplam üretilen miktarı hesapla
+            total_produced = sum(production.workorder_ids.mapped('qty_produced'))
 
-                _logger.warning(f"➕ Yeni iş emri oluşturuluyor — Kalan miktar: {remaining_qty}")
+            if total_produced < planned_qty:
+                _logger.warning(f"⏸ Parçalı üretim tespit edildi: {total_produced}/{planned_qty}")
 
-                new_workorder = self.env['mrp.workorder'].create({
-                    'production_id': workorder.production_id.id,
-                    'operation_id': workorder.operation_id.id,
-                    'workcenter_id': workorder.workcenter_id.id,
-                    'qty_produced': 0,
-                    'state': 'ready',
-                    'name': f"{workorder.name}-KALAN",
-                    'duration_expected': workorder.duration_expected,
-                    'product_id': workorder.product_id.id,
+                # Üretim emrinin yeni kopyasını oluştur
+                remaining_qty = planned_qty - total_produced
+                new_mo = self.env['mrp.production'].create({
+                    'product_id': production.product_id.id,
+                    'product_qty': remaining_qty,
+                    'product_uom_id': production.product_uom_id.id,
+                    'bom_id': production.bom_id.id,
+                    'origin': f"{production.name} - Split",
+                    'company_id': production.company_id.id,
                 })
 
-                _logger.warning(f"✅ Yeni iş emri oluşturuldu: {new_workorder.name}")
+                # Yeni üretim emri için iş emirleri oluştur
+                new_mo._generate_workorders()
+
+                _logger.warning(f"✅ Yeni üretim emri oluşturuldu: {new_mo.name} ({remaining_qty} adet)")
 
         return res
