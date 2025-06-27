@@ -7,28 +7,35 @@ class MrpWorkorder(models.Model):
     _inherit = 'mrp.workorder'
 
     def record_production(self):
-        for workorder in self:
-            _logger.warning(f"✅ [MODÜL] record_production override edildi — {workorder.name}")
+        self.ensure_one()
+        _logger.warning(f"✅ [MODÜL] record_production override edildi — {self.name}")
 
-            production = workorder.production_id
-            total_produced = sum(production.workorder_ids.mapped('qty_producing'))
-            expected_qty = production.product_qty
+        production = self.production_id
+        produced = self.qty_producing
+        expected = production.product_qty
+        _logger.warning(f"📊 Üretilen: {produced}, Planlanan: {expected}, İş Emri: {self.name}")
 
-            _logger.warning(f"📊 Üretilen: {total_produced}, Planlanan: {expected_qty}, İş Emri: {workorder.name}")
+        # Standart üretim işlemini yap
+        result = super().record_production()
 
-            # İlk veya son iş emri değilse ve üretim tam değilse üretim emrini böl
-            if total_produced < expected_qty:
-                workorders = production.workorder_ids
-                if workorder != workorders[0] and workorder != workorders[-1]:
-                    remaining_qty = expected_qty - total_produced
-                    if remaining_qty > 0:
-                        new_mo = production.copy({
-                            'product_qty': remaining_qty,
-                            'origin': f"{production.name} - Bölme",
-                        })
-                        _logger.warning(f"✂️ Yeni üretim emri oluşturuldu: {new_mo.name} — Miktar: {remaining_qty}")
+        # Parçalı üretim kontrolü (sadece son iş emri değilse ve eksik üretildiyse)
+        if produced < expected and not self == production.workorder_ids[-1]:
+            _logger.warning("🔁 Parçalı üretim tespit edildi. MO bölme işlemi başlatılıyor.")
 
-                        # İş emirlerini oluştur
-                        new_mo._create_workorder()
-        # Varsayılan davranışla devam et
-        return super(MrpWorkorder, self).record_production()
+            # Üretim emrini kopyalıyoruz
+            defaults = {
+                'product_qty': expected - produced,
+                'origin': production.name,
+            }
+            _logger.warning(f"📎 Üretim Emri Kopyalanıyor... {production.name}")
+            new_mo = production.copy(default=defaults)
+
+            _logger.warning(f"✅ Yeni Üretim Emri: {new_mo.name} | Miktar: {new_mo.product_qty}")
+
+            # Yeni üretim emrini aktive et
+            new_mo.action_confirm()
+            new_mo.action_assign()
+            new_mo._create_workorder_lines()
+            _logger.warning(f"🛠 Yeni üretim emrinde iş emirleri oluşturuldu: {new_mo.workorder_ids.mapped('name')}")
+
+        return result
