@@ -5,7 +5,7 @@ class MrpWorkorder(models.Model):
     _inherit = 'mrp.workorder'
 
     @api.model
-    def record_production(self):
+    def record_production(self, *args, **kwargs):
         workorder = self
 
         self.env['ir.logging'].create({
