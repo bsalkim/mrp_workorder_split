@@ -1,66 +1,44 @@
-from odoo import models, api
-from odoo.exceptions import UserError
+import logging
+from odoo import models
+
+_logger = logging.getLogger(__name__)
 
 class MrpWorkorder(models.Model):
     _inherit = 'mrp.workorder'
 
-    @api.model
     def record_production(self, *args, **kwargs):
-        workorder = self
+        _logger.warning(f"✅ [MODÜL] record_production override edildi — {self.name}")
 
-        self.env['ir.logging'].create({
-            'name': "MRP SPLIT",
-            'type': 'server',
-            'level': 'WARNING',
-            'dbname': self._cr.dbname,
-            'message': f"✅ [MODÜL] record_production override edildi — {workorder.name}",
-            'path': __name__,
-            'line': 0,
-            'func': 'record_production'
-        })
+        # Önce Odoo'nun standart sürecini çalıştır
+        res = super().record_production(*args, **kwargs)
 
-        production = workorder.production_id
-        expected_qty = workorder.qty_production
-        produced_qty = workorder.qty_produced
+        for workorder in self:
+            production = workorder.production_id
+            expected_qty = workorder.qty_production
+            produced_qty = workorder.qty_produced
 
-        self.env['ir.logging'].create({
-            'name': "MRP SPLIT",
-            'type': 'server',
-            'level': 'WARNING',
-            'dbname': self._cr.dbname,
-            'message': f"📊 Üretilen: {produced_qty}, Planlanan: {expected_qty}, İş Emri: {workorder.name}",
-            'path': __name__,
-            'line': 0,
-            'func': 'record_production'
-        })
+            _logger.warning(f"📊 Üretilen: {produced_qty}, Planlanan: {expected_qty}, İş Emri: {workorder.name}")
 
-        # Sadece parçalı üretim ve ilk/son dışında iş emrindeysek böl
-        if 0 < produced_qty < expected_qty:
-            self.env['ir.logging'].create({
-                'name': "MRP SPLIT",
-                'type': 'server',
-                'level': 'WARNING',
-                'dbname': self._cr.dbname,
-                'message': f"🔁 Parçalı üretim tespit edildi. Üretim emri bölünüyor...",
-                'path': __name__,
-                'line': 0,
-                'func': 'record_production'
-            })
+            # Sadece parçalı üretim ve ilk/son iş emri değilse böl
+            workorders = production.workorder_ids.sorted('id')
+            if workorder != workorders[0] and workorder != workorders[-1] and 0 < produced_qty < expected_qty:
+                _logger.warning("🔁 Parçalı üretim tespit edildi. Üretim emri bölünüyor...")
 
-            remaining_qty = expected_qty - produced_qty
+                remaining_qty = expected_qty - produced_qty
+                new_mo = self.env['mrp.production'].create({
+                    'product_id': production.product_id.id,
+                    'bom_id': production.bom_id.id,
+                    'product_qty': remaining_qty,
+                    'origin': f"{production.name} - Kalan",
+                    'company_id': production.company_id.id,
+                    'location_src_id': production.location_src_id.id,
+                    'location_dest_id': production.location_dest_id.id,
+                })
 
-            # Yeni üretim emri oluştur
-            new_mo = self.env['mrp.production'].create({
-                'product_id': production.product_id.id,
-                'bom_id': production.bom_id.id,
-                'product_qty': remaining_qty,
-                'origin': f"{production.name} - Kalan",
-                'company_id': production.company_id.id,
-                'location_src_id': production.location_src_id.id,
-                'location_dest_id': production.location_dest_id.id,
-            })
+                new_mo.action_confirm()
+                new_mo._generate_workorders()
 
-            new_mo.action_confirm()
-            new_mo._generate_workorders()
+                _logger.warning(f"🆕 Yeni Üretim Emri: {new_mo.name} — Miktar: {remaining_qty}")
+                _logger.warning(f"🛠 Yeni üretim emrinde iş emirleri: {new_mo.workorder_ids.mapped('name')}")
 
-        return super().record_production()
+        return res
