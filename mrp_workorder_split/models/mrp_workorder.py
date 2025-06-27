@@ -20,24 +20,28 @@ class MrpWorkorder(models.Model):
 
             workorders = production.workorder_ids.sorted('id')
             if workorder != workorders[0] and workorder != workorders[-1] and 0 < produced_qty < expected_qty:
-                _logger.warning("🔁 Parçalı üretim tespit edildi. Üretim emri draft'a çekilip bölünecek...")
+                _logger.warning("🔁 Parçalı üretim tespit edildi. Yeni üretim emri kopyalanıyor...")
 
-                # İş emirlerini iptal et
-                production.workorder_ids.write({'state': 'cancel'})
+                remaining_qty = expected_qty - produced_qty
 
-                # Üretim emrini draft'a çek
-                production.write({'state': 'draft'})
-
-                # Split işlemini tetikle
-                split_wizard = self.env['mrp.production.split'].create({
-                    'production_id': production.id,
-                    'split_qty': produced_qty,
+                new_mo = production.copy({
+                    'product_qty': remaining_qty,
+                    'origin': f"{production.name} - Kalan",
+                    'workorder_ids': False,
                 })
-                split_wizard.do_split()
 
-                _logger.warning("✅ Split işlemi tamamlandı, üretim emri tekrar başlatılıyor...")
+                new_mo.action_confirm()
 
-                # Üretim emrini tekrar onayla
-                production.action_confirm()
+                for new_workorder, original_workorder in zip(new_mo.workorder_ids.sorted('id'), production.workorder_ids.sorted('id')):
+                    if original_workorder.state == 'done':
+                        new_workorder.qty_production = 0
+                        new_workorder.qty_produced = 0
+                        new_workorder.write({'state': 'done'})
+                    elif original_workorder.qty_produced > 0:
+                        remaining_in_workorder = original_workorder.qty_production - original_workorder.qty_produced
+                        new_workorder.qty_production = remaining_in_workorder
+
+                _logger.warning(f"🆕 Yeni Üretim Emri: {new_mo.name} — Miktar: {remaining_qty}")
+                _logger.warning(f"🛠 Yeni üretim emrindeki iş emirleri ayarlandı: {new_mo.workorder_ids.mapped('name')}")
 
         return res
