@@ -23,7 +23,7 @@ class MrpWorkorder(models.Model):
                 _logger.warning("🔁 Parçalı üretim tespit edildi. Üretim emri draft'a çekilip bölünecek...")
 
                 # İş emirlerini iptal et
-                production.workorder_ids.button_cancel()
+                production.workorder_ids.write({'state': 'cancel'})
 
                 # Üretim emrini draft'a çek
                 production.write({'state': 'draft'})
