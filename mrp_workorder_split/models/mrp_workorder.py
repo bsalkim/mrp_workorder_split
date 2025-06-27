@@ -24,14 +24,19 @@ class MrpWorkorder(models.Model):
 
                 remaining_qty = expected_qty - produced_qty
 
-                new_mo = production.copy({
+                new_mo = self.env['mrp.production'].create({
+                    'product_id': production.product_id.id,
+                    'bom_id': production.bom_id.id,
                     'product_qty': remaining_qty,
                     'origin': f"{production.name} - Kalan",
-                    'workorder_ids': False,
+                    'company_id': production.company_id.id,
+                    'location_src_id': production.location_src_id.id,
+                    'location_dest_id': production.location_dest_id.id,
                 })
 
                 new_mo.action_confirm()
 
+                # Bitmiş iş emirlerini kapat ve miktarlarını sıfırla
                 for new_workorder, original_workorder in zip(new_mo.workorder_ids.sorted('id'), production.workorder_ids.sorted('id')):
                     if original_workorder.state == 'done':
                         new_workorder.qty_production = 0
