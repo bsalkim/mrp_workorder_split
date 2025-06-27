@@ -12,11 +12,10 @@ class MrpWorkorder(models.Model):
 
         for workorder in self:
             produced = workorder.qty_produced
-            expected = workorder.qty_to_produce
+            expected = workorder.qty_production.product_qty  # ← düzeltildi
 
             _logger.warning(f"📊 [MODÜL] {workorder.name} — Üretilen: {produced}, Planlanan: {expected}")
 
-            # Gerçek parçalı üretim varsa ve 0 < qty < toplam
             if 0 < produced < expected:
                 remaining_qty = expected - produced
                 production = workorder.production_id
@@ -33,5 +32,6 @@ class MrpWorkorder(models.Model):
                 })
 
                 new_mo._generate_workorders()
-
                 _logger.warning(f"✅ [MODÜL] Yeni üretim emri oluşturuldu: {new_mo.name} ({remaining_qty})")
+
+        return res
