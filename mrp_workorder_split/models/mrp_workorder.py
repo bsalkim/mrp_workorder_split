@@ -25,7 +25,7 @@ class MrpWorkorder(models.Model):
 
                 remaining_qty = expected_qty - produced_qty
 
-                # Ana üretim numarasını al (örn. MO/07081 veya MO/07081-001'den MO/07081 elde et)
+                # Ana üretim numarasını bul
                 match = re.match(r'(.*?)(-\d+)?$', production.name)
                 base_name = match.group(1) if match else production.name
 
@@ -56,6 +56,7 @@ class MrpWorkorder(models.Model):
 
                 new_mo.action_confirm()
 
+                # Tamamlanmış iş emirlerini güncelle
                 for new_workorder, original_workorder in zip(new_mo.workorder_ids.sorted('id'), production.workorder_ids.sorted('id')):
                     if original_workorder.qty_produced >= original_workorder.qty_production:
                         done_qty = original_workorder.qty_production
@@ -64,6 +65,9 @@ class MrpWorkorder(models.Model):
                             'qty_produced': done_qty,
                             'state': 'done',
                         })
+
+                # Ana üretim emrinin miktarını kalan adete güncelle
+                production.write({'product_qty': produced_qty})
 
                 _logger.warning(f"🆕 Yeni Üretim Emri: {new_mo.name} — Miktar: {remaining_qty}")
                 _logger.warning(f"🛠 Yeni üretim emrindeki iş emirleri ayarlandı: {new_mo.workorder_ids.mapped('name')}")
