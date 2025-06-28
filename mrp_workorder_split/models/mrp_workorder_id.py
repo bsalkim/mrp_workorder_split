@@ -1,5 +1,5 @@
 import logging
-from odoo import models
+from odoo import models, api
 import re
 
 _logger = logging.getLogger(__name__)
@@ -8,10 +8,8 @@ class MrpProduction(models.Model):
     _inherit = 'mrp.production'
 
     def _split_production(self, qty):
-        # Odoo'nun standart bölme fonksiyonu
-        backorder = super()._split_production(qty)
+        self.ensure_one()
 
-        # Referans numarasını düzenle
         match = re.match(r'(.*?)(-\d+)?$', self.name)
         base_name = match.group(1) if match else self.name
 
@@ -27,8 +25,14 @@ class MrpProduction(models.Model):
             suffix += 1
 
         new_name = f"{base_name}-{str(suffix).zfill(3)}"
-        backorder.write({'name': new_name})
 
-        _logger.warning(f"🔧 Backorder üretim emri numarası güncellendi: {new_name}")
+        backorder = self.copy({
+            'product_qty': qty,
+            'name': new_name
+        })
+
+        self.write({'product_qty': self.product_qty - qty})
+
+        _logger.warning(f"🔧 Backorder üretim emri oluşturuldu: {new_name}")
 
         return backorder
