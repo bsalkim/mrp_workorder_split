@@ -24,14 +24,22 @@ class MrpWorkorder(models.Model):
 
                 remaining_qty = expected_qty - produced_qty
 
+                base_name = production.name
+                existing_names = self.env['mrp.production'].search([('name', 'like', f"{base_name}-%")]).mapped('name')
+                suffix = 1
+                while f"{base_name}-{str(suffix).zfill(3)}" in existing_names:
+                    suffix += 1
+                new_name = f"{base_name}-{str(suffix).zfill(3)}"
+
                 new_mo = self.env['mrp.production'].create({
                     'product_id': production.product_id.id,
                     'bom_id': production.bom_id.id,
                     'product_qty': remaining_qty,
-                    'origin': f"{production.name} - Kalan",
+                    'origin': base_name,
                     'company_id': production.company_id.id,
                     'location_src_id': production.location_src_id.id,
                     'location_dest_id': production.location_dest_id.id,
+                    'name': new_name,
                 })
 
                 new_mo.action_confirm()
