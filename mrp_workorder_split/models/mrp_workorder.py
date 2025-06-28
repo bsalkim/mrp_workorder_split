@@ -40,9 +40,9 @@ class MrpWorkorder(models.Model):
                     if original_workorder.qty_produced >= original_workorder.qty_production:
                         new_workorder.qty_production = 0
                         new_workorder.qty_produced = 0
+                        new_workorder.quantity = 0
                         new_workorder.write({
                             'state': 'done',
-                            'qty_production': 0
                         })
 
                 _logger.warning(f"🆕 Yeni Üretim Emri: {new_mo.name} — Miktar: {remaining_qty}")
