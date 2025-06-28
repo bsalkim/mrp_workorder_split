@@ -23,30 +23,30 @@ class MrpWorkorder(models.Model):
             if workorder != workorders[0] and workorder != workorders[-1] and 0 < produced_qty < expected_qty:
                 _logger.warning("🔁 Parçalı üretim tespit edildi. Yeni üretim emri kopyalanıyor...")
 
-                # Eğer ilk defa parçalı üretim yapılıyorsa ana üretim emrinin numarasını -001 yap
                 match = re.match(r'(.*?)(-\d+)?$', production.name)
                 base_name = match.group(1) if match else production.name
 
                 if not match.group(2):
-                    # -001 ekle ve kaydet
-                    new_name = f"{base_name}-001"
-                    production.name = new_name
-                    base_name = new_name
-                    _logger.warning(f"🔧 Ana üretim emrinin adı güncellendi: {new_name}")
+                    production.name = f"{base_name}-001"
+                    base_name = production.name
+                    _logger.warning(f"🔧 Ana üretim emrinin adı güncellendi: {base_name}")
 
-                # Var olan kopyaları bul
-                existing_mos = self.env['mrp.production'].search([('name', 'like', f"{base_name}-%")])
+                # Ana üretim numarasını parçalayıp son ek yerine yeni numara ekle
+                base_match = re.match(r'(.*?)(-\d+)?$', base_name)
+                final_base = base_match.group(1) if base_match else base_name
+
+                existing_mos = self.env['mrp.production'].search([('name', 'like', f"{final_base}-%")])
                 existing_suffixes = []
                 for mo in existing_mos:
-                    m = re.match(rf'{re.escape(base_name)}-(\d+)$', mo.name)
+                    m = re.match(rf'{re.escape(final_base)}-(\d+)$', mo.name)
                     if m:
                         existing_suffixes.append(int(m.group(1)))
 
                 suffix = 1
-                while f"{base_name}-{str(suffix).zfill(3)}" in existing_mos.mapped('name'):
+                while suffix in existing_suffixes:
                     suffix += 1
 
-                new_name = f"{base_name}-{str(suffix).zfill(3)}"
+                new_name = f"{final_base}-{str(suffix).zfill(3)}"
 
                 remaining_qty = expected_qty - produced_qty
 
@@ -54,7 +54,7 @@ class MrpWorkorder(models.Model):
                     'product_id': production.product_id.id,
                     'bom_id': production.bom_id.id,
                     'product_qty': remaining_qty,
-                    'origin': base_name,
+                    'origin': final_base,
                     'company_id': production.company_id.id,
                     'location_src_id': production.location_src_id.id,
                     'location_dest_id': production.location_dest_id.id,
