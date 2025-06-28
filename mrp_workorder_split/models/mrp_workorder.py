@@ -40,10 +40,7 @@ class MrpWorkorder(models.Model):
                     if original_workorder.qty_produced >= original_workorder.qty_production:
                         new_workorder.qty_production = 0
                         new_workorder.qty_produced = 0
-                        new_workorder.quantity = 0
-                        new_workorder.write({
-                            'state': 'done',
-                        })
+                        new_workorder.write({'state': 'done'})
 
                 _logger.warning(f"🆕 Yeni Üretim Emri: {new_mo.name} — Miktar: {remaining_qty}")
                 _logger.warning(f"🛠 Yeni üretim emrindeki iş emirleri ayarlandı: {new_mo.workorder_ids.mapped('name')}")
