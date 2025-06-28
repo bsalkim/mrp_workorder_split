@@ -23,25 +23,33 @@ class MrpWorkorder(models.Model):
             if workorder != workorders[0] and workorder != workorders[-1] and 0 < produced_qty < expected_qty:
                 _logger.warning("🔁 Parçalı üretim tespit edildi. Yeni üretim emri kopyalanıyor...")
 
-                match = re.match(r'(.*?)(-\d+)?$', production.name)
-                base_name = match.group(1) if match else production.name
+                # Ana üretim numarası (ör: MO/07090)
+                main_number_match = re.match(r'(.*?)(-\d+)?$', production.name)
+                main_number = main_number_match.group(1) if main_number_match else production.name
 
-                # Ana üretim emrinin ilk parçalı üretiminde -001 ekleyelim
-                if not match.group(2):
-                    production.name = f"{base_name}-001"
-                    base_name = production.name
-                    _logger.warning(f"🔧 Ana üretim emrinin adı güncellendi: {base_name}")
+                # Eğer ilk defa parçalı üretim yapılıyorsa ana kaydı -001 ile güncelle
+                if not main_number_match.group(2):
+                    production.name = f"{main_number}-001"
+                    main_number = production.name
+                    _logger.warning(f"🔧 Ana üretim emrinin adı güncellendi: {main_number}")
 
-                # Şimdi mevcut en büyük numarayı bul
-                existing_mos = self.env['mrp.production'].search([('name', 'like', f"{base_name[:-4]}-%")])
+                # Ana üretim numarasını bul (ör: MO/07090)
+                base_number_match = re.match(r'(.*?)(-\d+)?$', main_number)
+                base_number = base_number_match.group(1) if base_number_match else main_number
+
+                # Var olan suffixleri bul
+                existing_mos = self.env['mrp.production'].search([('name', 'like', f"{base_number}-%")])
                 existing_suffixes = []
                 for mo in existing_mos:
-                    m = re.match(rf'{re.escape(base_name[:-4])}-(\d+)$', mo.name)
+                    m = re.match(rf'{re.escape(base_number)}-(\d+)$', mo.name)
                     if m:
                         existing_suffixes.append(int(m.group(1)))
 
-                next_suffix = max(existing_suffixes) + 1 if existing_suffixes else 1
-                new_name = f"{base_name[:-4]}-{str(next_suffix).zfill(3)}"
+                suffix = 1
+                while suffix in existing_suffixes:
+                    suffix += 1
+
+                new_name = f"{base_number}-{str(suffix).zfill(3)}"
 
                 remaining_qty = expected_qty - produced_qty
 
@@ -49,7 +57,7 @@ class MrpWorkorder(models.Model):
                     'product_id': production.product_id.id,
                     'bom_id': production.bom_id.id,
                     'product_qty': remaining_qty,
-                    'origin': base_name,
+                    'origin': base_number,
                     'company_id': production.company_id.id,
                     'location_src_id': production.location_src_id.id,
                     'location_dest_id': production.location_dest_id.id,
