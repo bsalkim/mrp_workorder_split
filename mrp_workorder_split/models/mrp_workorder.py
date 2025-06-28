@@ -38,9 +38,10 @@ class MrpWorkorder(models.Model):
 
                 for new_workorder, original_workorder in zip(new_mo.workorder_ids.sorted('id'), production.workorder_ids.sorted('id')):
                     if original_workorder.qty_produced >= original_workorder.qty_production:
+                        done_qty = original_workorder.qty_production
                         new_workorder.write({
-                            'qty_production': 0,
-                            'qty_produced': 0,
+                            'qty_production': done_qty,
+                            'qty_produced': done_qty,
                             'state': 'done',
                         })
 
