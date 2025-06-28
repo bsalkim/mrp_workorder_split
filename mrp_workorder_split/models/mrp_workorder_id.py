@@ -1,5 +1,5 @@
 import logging
-from odoo import models, api
+from odoo import models
 import re
 
 _logger = logging.getLogger(__name__)
@@ -21,7 +21,7 @@ class MrpProduction(models.Model):
                 existing_suffixes.append(int(m.group(1)))
 
         suffix = 1
-        while f"{base_name}-{str(suffix).zfill(3)}" in existing_mos.mapped('name'):
+        while suffix in existing_suffixes:
             suffix += 1
 
         new_name = f"{base_name}-{str(suffix).zfill(3)}"
@@ -31,7 +31,7 @@ class MrpProduction(models.Model):
             'name': new_name
         })
 
-        self.write({'product_qty': self.product_qty - qty})
+        self.product_qty -= qty
 
         _logger.warning(f"🔧 Backorder üretim emri oluşturuldu: {new_name}")
 
