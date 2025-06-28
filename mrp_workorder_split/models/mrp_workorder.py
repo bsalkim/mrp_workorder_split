@@ -23,25 +23,24 @@ class MrpWorkorder(models.Model):
             if workorder != workorders[0] and workorder != workorders[-1] and 0 < produced_qty < expected_qty:
                 _logger.warning("🔁 Parçalı üretim tespit edildi. Yeni üretim emri kopyalanıyor...")
 
-                # Ana üretim numarası (ör: MO/07090)
-                main_number_match = re.match(r'(.*?)(-\d+)?$', production.name)
-                main_number = main_number_match.group(1) if main_number_match else production.name
+                match = re.match(r'(.*?)(-\d+)?$', production.name)
+                main_number = match.group(1) if match else production.name
 
                 # Eğer ilk defa parçalı üretim yapılıyorsa ana kaydı -001 ile güncelle
-                if not main_number_match.group(2):
+                if not match.group(2):
                     production.name = f"{main_number}-001"
                     main_number = production.name
                     _logger.warning(f"🔧 Ana üretim emrinin adı güncellendi: {main_number}")
 
-                # Ana üretim numarasını bul (ör: MO/07090)
-                base_number_match = re.match(r'(.*?)(-\d+)?$', main_number)
-                base_number = base_number_match.group(1) if base_number_match else main_number
+                base_match = re.match(r'(.*?)(-\d+)?$', main_number)
+                base_number = base_match.group(1) if base_match else main_number
 
-                # Var olan suffixleri bul
+                # Tüm dallanmalar dahil, başı base_number ile başlayanları getir
                 existing_mos = self.env['mrp.production'].search([('name', 'like', f"{base_number}-%")])
                 existing_suffixes = []
                 for mo in existing_mos:
-                    m = re.match(rf'{re.escape(base_number)}-(\d+)$', mo.name)
+                    # Sadece ilk tireden sonraki sayıyı al, -001-002 gibi dallanmaları atla
+                    m = re.match(rf'{re.escape(base_number)}-(\d+)(?:-.*)?$', mo.name)
                     if m:
                         existing_suffixes.append(int(m.group(1)))
 
