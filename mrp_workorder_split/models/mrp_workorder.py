@@ -23,11 +23,16 @@ class MrpWorkorder(models.Model):
             if workorder != workorders[0] and workorder != workorders[-1] and 0 < produced_qty < expected_qty:
                 _logger.warning("🔁 Parçalı üretim tespit edildi. Yeni üretim emri kopyalanıyor...")
 
-                remaining_qty = expected_qty - produced_qty
-
-                # Ana üretim numarasını bul
+                # Eğer ilk defa parçalı üretim yapılıyorsa ana üretim emrinin numarasını -001 yap
                 match = re.match(r'(.*?)(-\d+)?$', production.name)
                 base_name = match.group(1) if match else production.name
+
+                if not match.group(2):
+                    # -001 ekle ve kaydet
+                    new_name = f"{base_name}-001"
+                    production.name = new_name
+                    base_name = new_name
+                    _logger.warning(f"🔧 Ana üretim emrinin adı güncellendi: {new_name}")
 
                 # Var olan kopyaları bul
                 existing_mos = self.env['mrp.production'].search([('name', 'like', f"{base_name}-%")])
@@ -38,10 +43,12 @@ class MrpWorkorder(models.Model):
                         existing_suffixes.append(int(m.group(1)))
 
                 suffix = 1
-                while suffix in existing_suffixes:
+                while f"{base_name}-{str(suffix).zfill(3)}" in existing_mos.mapped('name'):
                     suffix += 1
 
                 new_name = f"{base_name}-{str(suffix).zfill(3)}"
+
+                remaining_qty = expected_qty - produced_qty
 
                 new_mo = self.env['mrp.production'].create({
                     'product_id': production.product_id.id,
@@ -56,7 +63,6 @@ class MrpWorkorder(models.Model):
 
                 new_mo.action_confirm()
 
-                # Tamamlanmış iş emirlerini güncelle
                 for new_workorder, original_workorder in zip(new_mo.workorder_ids.sorted('id'), production.workorder_ids.sorted('id')):
                     if original_workorder.qty_produced >= original_workorder.qty_production:
                         done_qty = original_workorder.qty_production
@@ -66,7 +72,6 @@ class MrpWorkorder(models.Model):
                             'state': 'done',
                         })
 
-                # Ana üretim emrinin miktarını kalan adete güncelle
                 production.write({'product_qty': produced_qty})
 
                 _logger.warning(f"🆕 Yeni Üretim Emri: {new_mo.name} — Miktar: {remaining_qty}")
